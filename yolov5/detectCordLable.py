@@ -34,6 +34,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+import time
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -244,8 +245,10 @@ def parse_opt():
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
-    print_args(vars(opt))
+    # print_args(vars(opt))
+    print("parameters: ")
     print (opt)
+    time.sleep(10)
     return opt
 
 
