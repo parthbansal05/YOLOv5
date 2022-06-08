@@ -113,6 +113,7 @@ def detect_preloaded(
     
     lables=[]
     cords=[]
+    confs=[]
 
     for i, det in enumerate(pred):  # per image
         if len(det):
@@ -121,9 +122,10 @@ def detect_preloaded(
             for *xyxy, conf, cls in reversed(det):
                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                 c = int(cls)
-                label = f'{names[c]} {conf:.2f}'
+                label = names[c]
                 lables.append(xywh)
                 cords.append(label)
+                confs.append(conf)
                 # LOGGER.info(str(xywh) + '\n')
                 # LOGGER.info(str(label) + '\n')
-    return lables, cords
+    return lables, cords, confs
