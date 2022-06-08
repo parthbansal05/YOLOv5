@@ -122,10 +122,11 @@ def detect_preloaded(
             for *xyxy, conf, cls in reversed(det):
                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                 c = int(cls)
-                label = names[c]
-                lables.append(xywh)
-                cords.append(label)
-                confs.append(conf)
+                confl= f'{conf:.2f}'
+                label = f'{names[c]}'
+                cords.append(xywh)
+                lables.append(label)
+                confs.append(confl)
                 # LOGGER.info(str(xywh) + '\n')
                 # LOGGER.info(str(label) + '\n')
     return lables, cords, confs
