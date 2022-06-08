@@ -109,10 +109,15 @@ def run(
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     dt, seen = [0.0, 0.0, 0.0], 0
     for path, im, im0s, vid_cap, s in dataset:
+        print("im")
         print(im)
+        print("path")
         print(path)
+        print("im0s")
         print(im0s)
+        print("vid_cap")
         print(vid_cap)
+        print("s")
         print(s)
         t1 = time_sync()
         im = torch.from_numpy(im).to(device)
