@@ -105,7 +105,7 @@ def detect_preloaded(
     im /= 255  # 0 - 255 to 0.0 - 1.0
     if len(im.shape) == 3:
         im = im[None]  # expand for batch dim
-    gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+    gn = torch.tensor(np.shape(source))[[1, 0, 1, 0]]  # normalization gain whwh
 
     # Inference
     pred = model(im, augment=False)
@@ -117,7 +117,7 @@ def detect_preloaded(
     for i, det in enumerate(pred):  # per image
         if len(det):
             # Rescale boxes from img_size to im0 size
-            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], np.shape(source)).round()
             for *xyxy, conf, cls in reversed(det):
                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                 c = int(cls)
