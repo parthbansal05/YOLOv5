@@ -1,115 +1,75 @@
-import numpy as np
-import cv2
+from utils.torch_utils import select_device, time_sync
+from utils.plots import Annotator, colors, save_one_box
+from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from models.common import DetectMultiBackend
+import argparse
+import os
+import sys
+from pathlib import Path
+import time
+
 import torch
 import torch.backends.cudnn as cudnn
-from datetime import datetime
-from models.experimental import attempt_load
-from utils.general import non_max_suppression, set_logging
-from utils.torch_utils import select_device
 
-weights = './runs/train/yolov5l_result/weights/best.pt'
+from utils.augmentations import letterbox
+import numpy as np
 
-imgsz = 640
-conf_thres = 0.25
-iou_thres = 0.45
-max_det = 1000
-device = ''
-classes = None
-agnostic_nms = False
-half = False
-hide_conf = True
-thickness = 2
-rect_thickness = 3
-pred_shape = (480, 640, 3)
-vis_shape = (800, 600)
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-cap = cv2.VideoCapture(0)
 
-set_logging()
-device = select_device(device)
-half &= device.type != 'cpu' 
-model = attempt_load(weights, map_location=device)
-stride = int(model.stride.max())  # model stride
-names = model.module.names if hasattr(model, 'module') else model.names  # get class names
+@torch.no_grad()
+def detect(
+    weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+        source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
+        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+):
 
-while 1:
-    ret, frame = cap.read()
-    out = frame.copy()
-    frame = cv2.resize(frame, (pred_shape[1], pred_shape[0]), interpolation=cv2.INTER_LINEAR)
-    frame = np.transpose(frame, (2, 1, 0))
+    conf_thres = 0.25
+    iou_thres = 0.45
+    max_det = 1000
+    device = ''
+    classes = None
+    agnostic_nms = False
 
-    cudnn.benchmark = True  # set True to speed up constant image size inference
+    device = select_device(device)
+    model = DetectMultiBackend(weights, device=device, dnn=False, data=data, fp16=False)
+    stride, names, pt = model.stride, model.names, model.pt
 
-    if device.type != 'cpu':
-        model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
+    im0 = cv2.imread(source)  # BGR
+    print(im0)
+    # Padded resize
+    im = letterbox(im0, 640, stride, pt)[0]
 
-    frame = torch.from_numpy(frame).to(device)
-    frame = frame.float()
-    frame /= 255.0
-    if frame.ndimension() == 3:
-        frame = frame.unsqueeze(0)
+    # Convert
+    im = im.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+    im = np.ascontiguousarray(im)
 
-    frame = torch.transpose(frame, 2, 3)
+    im = torch.from_numpy(im).to(device)
+    im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+    im /= 255  # 0 - 255 to 0.0 - 1.0
+    if len(im.shape) == 3:
+        im = im[None]  # expand for batch dim
+    gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
 
-    pred = model(frame, augment=False)[0]
+    # Inference
+    pred = model(im, augment=False)
+
+    # NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-    # detections per image
-    for i, det in enumerate(pred):
-        
-        img_shape = frame.shape[2:]
-        out_shape = out.shape
-
-        s_ = f'{i}: '
-        s_ += '%gx%g ' % img_shape  # print string
-
+    for i, det in enumerate(pred):  # per image
         if len(det):
-
-            coords = det[:, :4]
-
-            gain = min(img_shape[0] / out_shape[0], img_shape[1] / out_shape[1])  # gain  = old / new
-            pad = (img_shape[1] - out_shape[1] * gain) / 2, (
-                    img_shape[0] - out_shape[0] * gain) / 2  # wh padding
-
-            coords[:, [0, 2]] -= pad[0]  # x padding
-            coords[:, [1, 3]] -= pad[1]  # y padding
-            coords[:, :4] /= gain
-
-            coords[:, 0].clamp_(0, out_shape[1])  # x1
-            coords[:, 1].clamp_(0, out_shape[0])  # y1
-            coords[:, 2].clamp_(0, out_shape[1])  # x2
-            coords[:, 3].clamp_(0, out_shape[0])  # y2
-
-            det[:, :4] = coords.round()
-
-            for c in det[:, -1].unique():
-                n = (det[:, -1] == c).sum()  # detections per class
-                s_ += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-                
+            # Rescale boxes from img_size to im0 size
+            det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
             for *xyxy, conf, cls in reversed(det):
-        
-                c = int(cls)  # integer class
-                label = names[c] if hide_conf else f'{names[c]} {conf:.2f}'
-
-                tl = rect_thickness
-
-                c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))
-                cv2.rectangle(out, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
-
-                if label:
-                    tf = max(tl - 1, 1)  # font thickness
-                    t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
-                    c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                    cv2.rectangle(out, c1, c2, color, -1, cv2.LINE_AA)  # filled
-                    cv2.putText(out, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
-                                lineType=cv2.LINE_AA)
-
-        print(f'{s_}Done.')
-        
-    out = cv2.resize(out, vis_shape, cv2.INTER_LINEAR)
-    cv2.imshow("out", out)
-    
-    if cv2.waitKey(5) & 0xFF == 27:
-        cap.release()
-        cv2.destroyAllWindows()
-        break
+                xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                c = int(cls)
+                label = f'{names[c]} {conf:.2f}'
+                LOGGER.info(str(xywh) + '\n')
+                LOGGER.info(str(label) + '\n')
