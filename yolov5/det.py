@@ -1,14 +1,9 @@
-from utils.torch_utils import select_device, time_sync
-from utils.plots import Annotator, colors, save_one_box
-from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
-from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from utils.torch_utils import select_device
+from utils.general import (cv2, non_max_suppression, scale_coords, xyxy2xywh)
 from models.common import DetectMultiBackend
-import argparse
 import os
 import sys
 from pathlib import Path
-import time
 
 import torch
 import torch.backends.cudnn as cudnn
