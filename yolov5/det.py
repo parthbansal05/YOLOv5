@@ -42,7 +42,7 @@ def detect(
     stride, names, pt = model.stride, model.names, model.pt
 
     im0 = cv2.imread(source)  # BGR
-    print(im0)
+    # print(im0)
     # Padded resize
     im = letterbox(im0, 640, stride, pt)[0]
 
@@ -62,7 +62,8 @@ def detect(
 
     # NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-
+    print(pred)
+    print(enumerate(pred))
     for i, det in enumerate(pred):  # per image
         if len(det):
             # Rescale boxes from img_size to im0 size
