@@ -68,6 +68,7 @@ def detect(
     stride, names, pt = model.stride, model.names, model.pt
 
     im0 = cv2.imread(source)  # BGR
+    print(im0)
     # Padded resize
     im = letterbox(im0, 640, stride, pt)[0]
 
