@@ -40,10 +40,9 @@ def detect(
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=False, data=data, fp16=False)
     stride, names, pt = model.stride, model.names, model.pt
-
+    
     im0 = cv2.imread(source)  # BGR
-    # print(im0)
-    # Padded resize
+
     im = letterbox(im0, 640, stride, pt)[0]
 
     # Convert
@@ -59,11 +58,11 @@ def detect(
 
     # Inference
     pred = model(im, augment=False)
-
-    # NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-    print(pred)
-    print(enumerate(pred))
+    
+    lables=[]
+    cords=[]
+
     for i, det in enumerate(pred):  # per image
         if len(det):
             # Rescale boxes from img_size to im0 size
@@ -72,5 +71,8 @@ def detect(
                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                 c = int(cls)
                 label = f'{names[c]} {conf:.2f}'
-                LOGGER.info(str(xywh) + '\n')
-                LOGGER.info(str(label) + '\n')
+                lables.append(xywh)
+                cords.append(label)
+                # LOGGER.info(str(xywh) + '\n')
+                # LOGGER.info(str(label) + '\n')
+    return lables, cords
